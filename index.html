@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jogo do Impostor</title>
+    <style>
+        :root {
+            --bg-colour: #121212;
+            --card-bg: #1e1e1e;
+            --primary: #bb86fc;
+            --primary-hover: #9965f4;
+            --text-light: #ffffff;
+            --text-muted: #b3b3b3;
+            --danger: #cf6679;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-colour: var(--bg-colour);colour: var(--text-light);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            background-colour: var(--card-bg);
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 400px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+
+        h1, h2 {
+            margin-bottom: 20px;
+            colour: var(--primary);
+        }
+
+        input[type="text"], input[type="number"] {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 10px;
+            border: none;
+            border-radius: 6px;
+            background-colour: #2c2c2c;
+            colour: white;
+            font-size: 16px;
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 6px;
+            background-colour: var(--primary);
+            colour: #000;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.2s;
+            margin-bottom: 10px;
+        }
+
+        button:hover {
+            background-colour: var(--primary-hover);
+        }
+
+        button.danger {
+            background-colour: var(--danger);
+            colour: white;
+        }
+
+        ul {
+            list-style-type: none;
+            margin-bottom: 20px;
+            text-align: left;
+        }
+
+        li {
+            background-colour: #2c2c2c;
+            padding: 10px;
+            margin-bottom: 5px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .remove-btn {
+            background-colour: transparent;
+            colour: var(--danger);
+            border: none;
+            cursor: pointer;
+            width: auto;
+            padding: 0;
+            margin: 0;
+            font-weight: bold;
+        }
+
+        .remove-btn:hover {
+            background-colour: transparent;
+            colour: #ff8a9a;
+        }
+
+        .screen {
+            display: none;
+        }
+
+        .screen.active {
+            display: block;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .secret-card {
+            background-colour: #2c2c2c;
+            padding: 40px 20px;
+            border-radius: 12px;
+            margin: 20px 0;
+            font-size: 24px;
+            font-weight: bold;
+            letter-spacing: 1px;
+            border: 2px dashed var(--primary);
+        }
+
+        .role-text {
+            font-size: 14px;
+            colour: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="setup-screen" class="container screen active">
+        <h1>Impostor</h1>
+        <p style="margin-bottom: 15px; colour: var(--text-muted);">Adicione os jogadores para começar</p>
+        
+        <input type="text" id="player-name" placeholder="Nome do jogador..." onkeypress="handleKeyPress(event)">
+        <button onclick="addPlayer()">Adicionar Jogador</button>
+
+        <ul id="player-list"></ul>
+
+        <div style="margin-top: 20px; text-align: left;">
+            <label for="impostor-count" style="font-size: 14px; colour: var(--text-muted);">Quantidade de Impostores:</label>
+            <input type="number" id="impostor-count" value="1" min="1" max="5" style="margin-top: 5px;">
+        </div>
+
+        <button onclick="startGame()" style="margin-top: 10px;">INICIAR JOGO</button>
+    </div>
+
+    <div id="pass-screen" class="container screen">
+        <h2>Vez de: <span id="current-player-name"></span></h2>
+        <p style="margin-bottom: 20px; colour: var(--text-muted);">Passe o dispositivo para este jogador. Certifique-se de que ninguém mais está olhando!</p>
+        <button onclick="revealCard()">Revelar Minha Palavra</button>
+    </div>
+
+    <div id="reveal-screen" class="container screen">
+        <h2>Seu Cartão</h2>
+        <p class="role-text" id="role-description"></p>
+        <div class="secret-card" id="secret-word-display">
+            </div>
+        <button onclick="nextTurn()">Esconder e Continuar</button>
+    </div>
+
+    <div id="end-screen" class="container screen">
+        <h1>Hora de Discutir!</h1>
+        <p style="margin-bottom: 20px;">Todos já viram suas palavras. Façam perguntas uns aos outros e tentem descobrir quem é o impostor!</p>
+        <button onclick="resetGame()">Jogar Novamente (Mesmos Jogadores)</button>
+        <button class="danger" onclick="fullReset()">Nova Partida (Zerar Tudo)</button>
+    </div>
+
+    <script>
+        // Banco de palavras e dicas difíceis para o impostor
+        const gameData = [
+    { word: "Submarino", hint: "Pressão" },
+    { word: "Vampiro", hint: "Reflexo" },
+    { word: "Origami", hint: "Geometria" },
+    { word: "Anestesia", hint: "Dormência" },
+    { word: "Labirinto", hint: "Perdição" },
+    { word: "Criptografia", hint: "Enigma" },
+    { word: "Holograma", hint: "Projeção" },
+    { word: "Passaporte", hint: "Fronteira" },
+    { word: "Dinossauro", hint: "Extinção" },
+    { word: "Paraquedas", hint: "Gravidade" },
+    { word: "Claustrofobia", hint: "Elevador" },
+    { word: "Miragem", hint: "Deserto" },
+    { word: "Tatuagem", hint: "Pigmento" },
+    { word: "Cleptomaníaco", hint: "Compulsão" },
+    { word: "Ampulheta", hint: "Areia" },
+    { word: "Bumerangue", hint: "Retorno" },
+    { word: "Camaleão", hint: "Disfarce" },
+    { word: "Sonâmbulo", hint: "Transe" },
+    { word: "Alquimista", hint: "Transmutação" },
+    { word: "Claquete", hint: "Sincronia" },
+    { word: "Clarividência", hint: "Intuição" },
+    { word: "Hipnose", hint: "Sugestão" },
+    { word: "Inundação", hint: "Dilúvio" },
+    { word: "Nômade", hint: "Migração" },
+    { word: "Oráculo", hint: "Profecia" },
+    { word: "Para-raios", hint: "Eletricidade" },
+    { word: "Quarentena", hint: "Isolamento" },
+    { word: "Sarcófago", hint: "Preservação" },
+    { word: "Telescópio", hint: "Cosmos" },
+    { word: "Tornado", hint: "Vórtice" },
+    { word: "Utopia", hint: "Perfeição" },
+    { word: "Ventríloquo", hint: "Ilusão" },
+    { word: "Xeque-mate", hint: "Estratégia" },
+    { word: "Zodíaco", hint: "Astrologia" },
+    { word: "Arqueólogo", hint: "Fóssil" },
+    { word: "Bússola", hint: "Orientação" },
+    { word: "Carrossel", hint: "Rotação" },
+    { word: "Eclipse", hint: "Alinhamento" },
+    { word: "Glaciar", hint: "Erosão" },
+    { word: "Insônia", hint: "Vigília" },
+    { word: "Labareda", hint: "Combustão" },
+    { word: "Medalha", hint: "Mérito" },
+    { word: "Sósia", hint: "Identidade" },
+    { word: "Faraó", hint: "Dinastia" },
+    { word: "Muralha", hint: "Fortificação" },
+    { word: "Termômetro", hint: "Mercúrio" },
+    { word: "Banquete", hint: "Abundância" },
+    { word: "Obsidiana", hint: "Vidro" },
+    { word: "Metamorfose", hint: "Casulo" },
+    { word: "Sinfonia", hint: "Maestro" }
+];
+
+        let players = [];
+        let assignedRoles = [];
+        let currentPlayerIndex = 0;
+        let currentWordObj = null;
+
+        // Funções de UI (Alternar Telas)
+        function showScreen(screenId) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.getElementById(screenId).classList.add('active');
+        }
+
+        // Funções de Gerenciamento de Jogadores
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') addPlayer();
+        }
+
+        function addPlayer() {
+            const input = document.getElementById('player-name');
+            const name = input.value.trim();
+            if (name && !players.includes(name)) {
+                players.push(name);
+                input.value = '';
+                updatePlayerList();
+            }
+        }
+
+        function removePlayer(index) {
+            players.splice(index, 1);
+            updatePlayerList();
+        }
+
+        function updatePlayerList() {
+            const list = document.getElementById('player-list');
+            list.innerHTML = '';
+            players.forEach((player, index) => {
+                list.innerHTML += `
+                    <li>
+                        ${player} 
+                        <button class="remove-btn" onclick="removePlayer(${index})">X</button>
+                    </li>
+                `;
+            });
+        }
+
+        // Lógica do Jogo
+        function startGame() {
+            const impostorCount = parseInt(document.getElementById('impostor-count').value);
+            
+            if (players.length < 3) {
+                alert("Adicione pelo menos 3 jogadores!");
+                return;
+            }
+            if (impostorCount >= players.length) {
+                alert("O número de impostores deve ser menor que o número de jogadores!");
+                return;
+            }
+
+            // Sorteia a palavra da rodada
+            currentWordObj = gameData[Math.floor(Math.random() * gameData.length)];
+            
+            // Define os papéis (Cidadão ou Impostor)
+            assignedRoles = Array(players.length).fill('cidadao');
+            
+            // Sorteia os impostores
+            let impostoresSorteados = 0;
+            while (impostoresSorteados < impostorCount) {
+                let randomIndex = Math.floor(Math.random() * players.length);
+                if (assignedRoles[randomIndex] !== 'impostor') {
+                    assignedRoles[randomIndex] = 'impostor';
+                    impostoresSorteados++;
+                }
+            }
+
+            currentPlayerIndex = 0;
+            setupNextPassScreen();
+        }
+
+        function setupNextPassScreen() {
+            document.getElementById('current-player-name').innerText = players[currentPlayerIndex];
+            showScreen('pass-screen');
+        }
+
+        function revealCard() {
+            const role = assignedRoles[currentPlayerIndex];
+            const displayBox = document.getElementById('secret-word-display');
+            const roleDesc = document.getElementById('role-description');
+
+            if (role === 'impostor') {
+                roleDesc.innerText = "VOCÊ É O IMPOSTOR! Sua dica é:";roleDesc.style.colour = "var(--danger)";
+                displayBox.innerText = currentWordObj.hint;
+                displayBox.style.borderColor = "var(--danger)";
+            } else {
+                roleDesc.innerText = "A palavra secreta de todos é:";roleDesc.style.colour = "var(--text-muted)";
+                displayBox.innerText = currentWordObj.word;
+                displayBox.style.borderColor = "var(--primary)";
+            }
+
+            showScreen('reveal-screen');
+        }
+
+        function nextTurn() {
+            currentPlayerIndex++;
+            if (currentPlayerIndex < players.length) {
+                setupNextPassScreen();
+            } else {
+                showScreen('end-screen');
+            }
+        }
+
+        function resetGame() {
+            showScreen('setup-screen');
+        }
+
+        function fullReset() {
+            players = [];
+            updatePlayerList();
+            document.getElementById('impostor-count').value = 1;
+            showScreen('setup-screen');
+        }
+    </script>
+</body>
+</html>
